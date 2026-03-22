@@ -18,7 +18,11 @@ def _make_request(endpoint, params):
     url = f"{BASE_URL}{endpoint}"
     response = requests.get(url, headers=headers, params=params)
     
-    if response.status_code >= 400:
+    if response.status_code == 404:
+        raise Exception("Profile not found or is private.")
+    elif response.status_code == 429:
+        raise Exception("Rate limit exceeded for the API. Please try again later.")
+    elif response.status_code >= 400:
         raise Exception(f"API Error ({response.status_code}): {response.text}")
     
     try:
@@ -27,8 +31,18 @@ def _make_request(endpoint, params):
         raise Exception(f"Invalid JSON response: {response.text[:100]}")
 
 def fetch_profile(profile_url):
+    if not profile_url or "/in/" not in profile_url:
+        raise ValueError("Invalid LinkedIn URL format. Expected format: 'linkedin.com/in/username'.")
+        
     # Step 1: Get URN from username
     username = profile_url.split("/in/")[-1].strip("/")
+    if "?" in username:
+        username = username.split("?")[0]
+    username = username.strip("/")
+        
+    if not username:
+        raise ValueError("Could not extract username from the provided URL.")
+        
     urn_data = _make_request("/api/v1/profile/username-to-urn", {"username": username})
     
     if not urn_data.get("success") or not urn_data.get("data"):
